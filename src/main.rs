@@ -1,5 +1,10 @@
 use macroquad::prelude::*;
 
+struct Cactus {
+    x: f32,
+    height: f32,
+}
+
 #[macroquad::main("dino game")]
 async fn main() {
     let ground_y = 350.0;
@@ -17,8 +22,12 @@ async fn main() {
 
     // cactus properties
     let cactus_width = 25.0;
-    let cactus_height = 50.0;
-    let mut cactus_x = screen_width() * 0.8;
+    let mut cacti = vec![
+        Cactus {
+            x: screen_width() * 0.8,
+            height: 50.0,
+        }
+    ];
     let base_cactus_speed = 350.0;
 
     // score
@@ -53,11 +62,27 @@ async fn main() {
             }
 
             // move cactus to the left
-            cactus_x -= cactus_speed * delta;
+            for cactus in cacti.iter_mut() {
+                cactus.x -= cactus_speed * delta;
+            }
 
-            // respawn cactus after it leaves screen
-            if cactus_x + cactus_width < 0.0 {
-                cactus_x = screen_width() + macroquad::rand::gen_range(150.0, 400.0);
+            cacti.retain(|cactus| cactus.x + cactus_width >= 0.0);
+
+            // spawn new cactus when rightmost cactus is far left enough
+            let rightmost_cactus = cacti.iter().map(|cactus| cactus.x).reduce(f32::max);
+
+            if let Some(rightmost_x) = rightmost_cactus {
+                if rightmost_x < screen_width() - 100.0 {
+                    let gap = macroquad::rand::gen_range(300.0, 500.0);
+                    let start_x = screen_width() + gap;
+                    
+                    spawn_cactus_pattern(&mut cacti, start_x);
+                }
+            }
+            else {
+                // spawn a pattern if no cacti remain
+                let start_x = screen_width() + macroquad::rand::gen_range(300.0, 500.0);
+                spawn_cactus_pattern(&mut cacti, start_x);
             }
 
             // rectangle used for collision detection
@@ -66,14 +91,17 @@ async fn main() {
                 dino_width, dino_height,
             );
 
-            let cactus_rect = Rect::new(
-                cactus_x, ground_y - cactus_height,
-                cactus_width, cactus_height,
-            );
+            for cactus in cacti.iter() {
+                let cactus_rect = Rect::new(
+                    cactus.x, ground_y - cactus.height,
+                    cactus_width, cactus.height,
+                );
 
-            // detect collision
-            if dino_rect.overlaps(&cactus_rect) {
-                game_over = true;
+                // detect collision
+                if dino_rect.overlaps(&cactus_rect) {
+                    game_over = true;
+                    break;
+                }
             }
         }
         else {
@@ -81,7 +109,12 @@ async fn main() {
             if is_key_pressed(KeyCode::R) {
                 dino_y = ground_y - dino_height;
                 vel_y = 0.0;
-                cactus_x = screen_width() * 0.8;
+                cacti = vec![
+                    Cactus {
+                        x: screen_width() * 0.8,
+                        height: 50.0,
+                    }
+                ];
                 score = 0.0;
                 game_over = false;
             }
@@ -117,25 +150,29 @@ async fn main() {
             3.0, WHITE,
         );
 
-        // draw cactus
-        draw_rectangle(
-            cactus_x, ground_y - cactus_height,
-            cactus_width, cactus_height,
-            BLACK
-        );
+        for cactus in cacti.iter() {
+            let cactus_y = ground_y - cactus.height;
 
-        // draw cactus arms
-        draw_rectangle(
-            cactus_x - 8.0, ground_y - 35.0,
-            8.0, 6.0,
-            BLACK,
-        );
+            // draw cactus
+            draw_rectangle(
+                cactus.x, cactus_y,
+                cactus_width, cactus.height,
+                BLACK
+            );
 
-        draw_rectangle(
-            cactus_x - 8.0, ground_y - 45.0,
-            6.0, 16.0,
-            BLACK,
-        );
+            // draw cactus arms
+            draw_rectangle(
+                cactus.x - 8.0, cactus_y + cactus.height * 0.3,
+                8.0, 6.0,
+                BLACK,
+            );
+
+            draw_rectangle(
+                cactus.x - 8.0, cactus_y + cactus.height * 0.1,
+                6.0, cactus.height * 0.35,
+                BLACK,
+            );
+        }
 
         // display score
         let score_text = format!("SCORE: {:04}", score as u32);
@@ -173,5 +210,37 @@ async fn main() {
         
         // wait and render the next frame
         next_frame().await;
+    }
+}
+
+fn spawn_cactus_pattern(cacti: &mut Vec<Cactus>, start_x: f32) {
+    let pattern = macroquad::rand::gen_range(0, 3);
+
+    match pattern {
+        0 => {
+            // one cactus
+            cacti.push(Cactus {
+                x: start_x,
+                height: macroquad::rand::gen_range(35.0, 66.0),
+            });
+        }
+        1 => {
+            // two cacti
+            for i in 0..2 {
+                cacti.push(Cactus {
+                    x: start_x + i as f32 * 35.0,
+                    height: macroquad::rand::gen_range(35.0, 66.0),
+                });
+            }
+        }
+        _ => {
+            // three cacti
+            for i in 0..3 {
+                cacti.push(Cactus {
+                    x: start_x + i as f32 * 35.0,
+                    height: macroquad::rand::gen_range(35.0, 66.0),
+                });
+            }
+        }
     }
 }
