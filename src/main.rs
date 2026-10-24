@@ -19,7 +19,10 @@ async fn main() {
     let cactus_width = 25.0;
     let cactus_height = 50.0;
     let mut cactus_x = screen_width() * 0.8;
-    let cactus_speed = 350.0;
+    let base_cactus_speed = 350.0;
+
+    // score
+    let mut score = 0.0;
 
     // game state
     let mut game_over = false;
@@ -28,6 +31,12 @@ async fn main() {
         let delta = get_frame_time();
 
         if !game_over {
+            // increase score while playing
+            score += delta * 10.0;
+
+            // increase cactus speed as score rises
+            let cactus_speed = (base_cactus_speed + score * 0.5).min(700.0);
+
             // jump only when dino is on the ground
             if (is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Up)) && dino_y >= ground_y - dino_height {
                 vel_y = jump_strength;
@@ -73,6 +82,7 @@ async fn main() {
                 dino_y = ground_y - dino_height;
                 vel_y = 0.0;
                 cactus_x = screen_width() * 0.8;
+                score = 0.0;
                 game_over = false;
             }
         }
@@ -127,7 +137,17 @@ async fn main() {
             BLACK,
         );
 
-        // title
+        // display score
+        let score_text = format!("SCORE: {:04}", score as u32);
+
+        draw_text(
+            &score_text,
+            screen_width() - 180.0,
+            35.0, 25.0,
+            BLACK,
+        );
+
+        // game instructions
         if game_over {
             draw_text(
                 "GAME OVER",
