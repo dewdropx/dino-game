@@ -9,6 +9,48 @@ struct Cactus {
 async fn main() {
     let ground_y = 350.0;
 
+    // load dino sprite sheet
+    let dino_texture = load_texture("assets/dino_sheet.png")
+        .await
+        .expect("failed to load dino sprite sheet");
+    
+    dino_texture.set_filter(FilterMode::Nearest);
+
+    // load mushroom sprite
+    let mushroom_texture = load_texture("assets/mushroom.png")
+        .await
+        .expect("failed to load mushroom texture");
+
+    mushroom_texture.set_filter(FilterMode::Nearest);
+
+    // load misc textures
+    let misc_texture = load_texture("assets/sprites_misc.png")
+        .await
+        .expect("failed to load misc textures");
+
+    misc_texture.set_filter(FilterMode::Nearest);
+
+    // load sky texture
+    let sky_texture = load_texture("assets/sky.png")
+        .await
+        .expect("failed to load sky background");
+
+    sky_texture.set_filter(FilterMode::Nearest);
+
+    // load cloud texture
+    let cloud_texture = load_texture("assets/clouds.png")
+        .await
+        .expect("failed to load cloud texture");
+
+    cloud_texture.set_filter(FilterMode::Nearest);
+
+    // load mountains texture
+    let mountain_texture = load_texture("assets/mountains.png")
+        .await
+        .expect("failed to load mountain texture");
+
+    mountain_texture.set_filter(FilterMode::Nearest);
+
     // dino properties
     let mut dino_y = ground_y - 80.0;
     let mut vel_y = 0.0;
@@ -20,8 +62,13 @@ async fn main() {
     let gravity = 1800.0;
     let jump_strength = -650.0;
 
+    // dino animation
+    let mut animation_timer = 0.0;
+    let mut leg_frame = 0;
+    let animation_speed = 0.12;
+
     // cactus properties
-    let cactus_width = 25.0;
+    let cactus_width = 44.0;
     let mut cacti = vec![
         Cactus {
             x: screen_width() * 0.8,
@@ -29,6 +76,14 @@ async fn main() {
         }
     ];
     let base_cactus_speed = 350.0;
+
+    // mountain scrolling
+    let mut mountain_offset = 0.0;
+    let mountain_speed = 80.0;
+
+    // clouds scrolling
+    let mut cloud_offset = 0.0;
+    let cloud_speed = 25.0;
 
     // score
     let mut score = 0.0;
@@ -61,6 +116,21 @@ async fn main() {
                 vel_y = 0.0;
             }
 
+            // animate legs only when on the ground
+            if dino_y >= ground_y - dino_height {
+                animation_timer += delta;
+
+                if animation_timer >= animation_speed {
+                    leg_frame = 1 - leg_frame;
+                    animation_timer = 0.0;
+                }
+            }
+            else {
+                // reset animation while jumping
+                leg_frame = 0;
+                animation_timer = 0.0;
+            }
+
             // move cactus to the left
             for cactus in cacti.iter_mut() {
                 cactus.x -= cactus_speed * delta;
@@ -85,16 +155,16 @@ async fn main() {
                 spawn_cactus_pattern(&mut cacti, start_x);
             }
 
-            // rectangle used for collision detection
+            // hitbox for collision detection
             let dino_rect = Rect::new(
-                dino_x, dino_y,
-                dino_width, dino_height,
+                dino_x + 8.0, dino_y + 10.0,
+                dino_width - 16.0, dino_height - 14.0,
             );
 
             for cactus in cacti.iter() {
                 let cactus_rect = Rect::new(
-                    cactus.x, ground_y - cactus.height,
-                    cactus_width, cactus.height,
+                    cactus.x + 6.0, ground_y - cactus.height + 12.0,
+                    cactus_width - 12.0, cactus.height - 12.0,
                 );
 
                 // detect collision
@@ -103,12 +173,28 @@ async fn main() {
                     break;
                 }
             }
+
+            // scroll mountains
+            mountain_offset += mountain_speed * delta;
+
+            if mountain_offset >= mountain_texture.width() {
+                mountain_offset -= mountain_texture.width();
+            }
+
+            // scroll clouds
+            cloud_offset += cloud_speed * delta;
+
+            if cloud_offset >= cloud_texture.width() {
+                cloud_offset -= cloud_texture.width();
+            }
         }
         else {
             // restart the game
             if is_key_pressed(KeyCode::R) {
                 dino_y = ground_y - dino_height;
                 vel_y = 0.0;
+                animation_timer = 0.0;
+                leg_frame = 0;
                 cacti = vec![
                     Cactus {
                         x: screen_width() * 0.8,
@@ -120,57 +206,106 @@ async fn main() {
             }
         }
 
-        // clear the screen with a light background
+        // draw sky background
         clear_background(WHITE);
 
+        draw_texture_ex(
+            &sky_texture,
+            0.0, 0.0,
+            WHITE,
+
+            DrawTextureParams {
+                dest_size: Some(vec2(screen_width(), screen_height())),
+                ..Default::default()
+            },
+        );
+
+        // draw clouds
+        let cloud_width = cloud_texture.width();
+        let mut cloud_x = -cloud_offset;
+
+        while cloud_x < screen_width() {
+            draw_texture_ex(
+                &cloud_texture,
+                cloud_x, 0.0,
+                WHITE,
+
+                DrawTextureParams {
+                    dest_size: Some(vec2(cloud_texture.width(), cloud_texture.height())),
+                    flip_y: true,
+                    ..Default::default()
+                },
+            );
+
+            cloud_x += cloud_width;
+        }
+
+        // draw mountains
+        let mountain_width = mountain_texture.width();
+        let mountain_height = mountain_texture.height();
+        let mountain_y = ground_y - mountain_height;
+        let mut mountain_x = -mountain_offset;
+
+        while mountain_x < screen_width() {
+            draw_texture(
+                &mountain_texture,
+                mountain_x, mountain_y,
+                WHITE,
+            );
+
+            mountain_x += mountain_width;
+        }
+
         // draw the ground
-        draw_line(
-            0.0, ground_y,
-            screen_width(), ground_y,
-            2.0, BLACK,
+        let ground_width = 32.0;
+        let ground_height = 32.0;
+        let mut ground_x = 0.0;
+
+        while ground_x < screen_width() {
+            draw_texture_ex(
+                &misc_texture,
+                ground_x, ground_y,
+                WHITE,
+
+                DrawTextureParams {
+                    source: Some(Rect::new(0.0, 0.0, 16.0, 16.0)),
+                    dest_size: Some(vec2(ground_width, ground_height)),
+                    ..Default::default()
+                },
+            );
+
+            ground_x += ground_width;
+        }
+
+        // draw dino sprite with animation
+        let sprite_x = if leg_frame == 0 {0.0} else {96.0};
+
+        draw_texture_ex(
+            &dino_texture,
+            dino_x, dino_y + 24.0,
+            WHITE,
+
+            DrawTextureParams {
+                source: Some(Rect::new(sprite_x, 40.0, 48.0, 56.0)),
+                dest_size: Some(vec2(48.0, 56.0)),
+                ..Default::default()
+            },
         );
 
-        // draw dino body
-        draw_rectangle(
-            dino_x, dino_y,
-            dino_width, dino_height,
-            BLACK,
-        );
-
-        // draw dino head
-        draw_rectangle(
-            dino_x + 30.0, dino_y - 25.0,
-            30.0, 30.0,
-            BLACK,
-        );
-
-        // draw dino eye
-        draw_circle(
-            dino_x + 50.0, dino_y - 15.0,
-            3.0, WHITE,
-        );
-
+        // draw mushroom sprites
         for cactus in cacti.iter() {
-            let cactus_y = ground_y - cactus.height;
+            let mushroom_height = cactus.height;
+            let mushroom_y = ground_y - mushroom_height + 6.0;
 
-            // draw cactus
-            draw_rectangle(
-                cactus.x, cactus_y,
-                cactus_width, cactus.height,
-                BLACK
-            );
+            draw_texture_ex(
+                &mushroom_texture,
+                cactus.x - 6.0, mushroom_y,
+                WHITE,
 
-            // draw cactus arms
-            draw_rectangle(
-                cactus.x - 8.0, cactus_y + cactus.height * 0.3,
-                8.0, 6.0,
-                BLACK,
-            );
-
-            draw_rectangle(
-                cactus.x - 8.0, cactus_y + cactus.height * 0.1,
-                6.0, cactus.height * 0.35,
-                BLACK,
+                DrawTextureParams {
+                    dest_size: Some(vec2(cactus_width, mushroom_height)),
+                    ..Default::default()
+                },
             );
         }
 
@@ -188,16 +323,9 @@ async fn main() {
         if game_over {
             draw_text(
                 "GAME OVER",
-                screen_width() / 2.0 - 100.0,
+                screen_width() / 2.0 - 70.0,
                 120.0, 40.0,
                 RED,
-            );
-
-            draw_text(
-                "press R to restart",
-                screen_width() / 2.0 - 100.0,
-                160.0, 25.0,
-                BLACK,
             );
         }
         else {
@@ -228,7 +356,7 @@ fn spawn_cactus_pattern(cacti: &mut Vec<Cactus>, start_x: f32) {
             // two cacti
             for i in 0..2 {
                 cacti.push(Cactus {
-                    x: start_x + i as f32 * 35.0,
+                    x: start_x + i as f32 * 44.0,
                     height: macroquad::rand::gen_range(35.0, 66.0),
                 });
             }
@@ -237,7 +365,7 @@ fn spawn_cactus_pattern(cacti: &mut Vec<Cactus>, start_x: f32) {
             // three cacti
             for i in 0..3 {
                 cacti.push(Cactus {
-                    x: start_x + i as f32 * 35.0,
+                    x: start_x + i as f32 * 44.0,
                     height: macroquad::rand::gen_range(35.0, 66.0),
                 });
             }
