@@ -60,7 +60,7 @@ Cargo will download the required dependencies, compile the project, and launch t
 |---|---|
 | `Space` | Jump |
 | `Up Arrow` | Jump |
-| `R` | Restart after game over |
+| `R` | Restart |
 
 ## Project Structure
 
