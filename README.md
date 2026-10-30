@@ -1,6 +1,6 @@
 # Dino Game — Rust
 
-A 2D endless runner inspired by the Google Chrome Dino game, built from scratch in **Rust** using the [Macroquad](https://macroquad.rs/) game development library.
+A 2D endless runner inspired by the Google's Dino game, built from scratch in **Rust** using the [Macroquad](https://macroquad.rs/) game development library.
 
 The project started as a simple playable prototype and evolved into a sprite-based game featuring animated characters, scrolling backgrounds, randomized obstacles, progressive difficulty, and collision detection.
 
